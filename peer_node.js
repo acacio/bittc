@@ -1,37 +1,8 @@
 const EventEmitter = require('events').EventEmitter;
 const net = require('net');
 
-// HANDSHAKE
+const Message = require('./message');
 
-const protocol = 'BitTorrent protocol';
-const infoHash = Buffer.from('ca155edaa8132d637537990d15dd70f277f72c50', 'hex');
-
-const handshake = Buffer.concat([
-    Buffer.from([protocol.length]),
-    Buffer.from(protocol, 'ascii'),
-    Buffer.alloc(8),
-    infoHash,
-    peerId
-]);
-
-
-// INTERESTED
-var interested = Buffer.alloc(5);
-interested.writeInt32BE(1);
-interested[4] = 2;
-
-
-// REQUEST
-const pieceIdx = 0;
-const begin = 0;
-const length = 3332;
-
-var request = Buffer.alloc(17);
-request.writeInt32BE(13);
-request[4] = 6;
-request.writeInt32BE(pieceIdx, 5);
-request.writeInt32BE(begin, 9);
-request.writeInt32BE(length, 13);
 
 // Peer states
 const HANDSHAKE = 0;
@@ -39,12 +10,19 @@ const CHOKED = 1;
 
 class PeerNode extends EventEmitter {
 
-    constructor (master, opts) {
+    constructor (master, torrent, opts) {
         super();
 
         this.master = master;
+        this.torrent = torrent;
+
         this.ip = opts.ip;
         this.port = opts.port;
+
+        // buffer for arrived chunks of messages
+        this.buffer = [];
+        // list of messages from peer
+        this.inbox = [];
 
         this.state = new Set([HANDSHAKE, CHOKED]);
 
@@ -52,7 +30,12 @@ class PeerNode extends EventEmitter {
 
         this.conn = net.createConnection(this.port, this.ip, () => {
             console.log('connected');
-            this.conn.write(handshake, () => {
+
+            const handshake = Message.handshake(
+                this.torrent.infoHash,
+                this.master.peerId);
+
+            this.conn.write(handshake.asBytes, () => {
                 console.log('send handshake');
             });
         });
@@ -63,59 +46,65 @@ class PeerNode extends EventEmitter {
 
         this.conn.on('data', (chunk) => {
 
+            this.buffer.push(chunk);
 
-            // receive HANDSHAKE
+            const buffer = Buffer.concat(this.buffer);
+
+            var message, restOfBuffer;
             if (this.state.has(HANDSHAKE)) {
-
-
-                const peerId = chunk.slice(chunk.length - 20).toString();
-                console.log(`received HANDSHAKE from: ${peerId}`);
+                [message, restOfBuffer] = Message.parseHandshake(buffer);
                 this.state.delete(HANDSHAKE);
-
-
-
             } else {
+                [message, restOfBuffer] = Message.parse(buffer);
+            }
 
-                const length = chunk.readInt32BE();
-                const code = chunk[4];
-
-
-                // handle BITFIELD
-                if (code == 5) {
-                    console.log('received BITFIELD');
-                    this.conn.write(interested, () => {
-                        console.log('sent INTERESTED');
-                    });
-                // handle UNCHOKE
-                } else if (code == 1) {
-                    console.log('received UNCHOKE');
-                    this.state.delete(CHOKED);
-
-                    this.conn.write(request, () => {
-                        console.log('sent REQUEST');
-                    });
-                // handle PIECE
-                } else if (code == 7) {
-
-
-
-                    const piece = {
-                        pieceIdx : chunk.readInt32BE(5),
-                        begin : chunk.readInt32BE(9),
-                        block : chunk.slice(13)
-                    };
-
-                    this.master.emit('piece', piece);
-
-
-
-                } else {
-                    console.log('unknown message');
-                }
-
+            if (message) {
+                this.inbox.push(message);
+                this.buffer = [restOfBuffer];
             }
 
         });
+
+
+        this.react();
+    }
+
+    react() {
+        this.handleIncomingMessages();
+        this.inbox = [];
+
+        setImmediate(() => {this.react()});
+    }
+
+
+    handleIncomingMessages() {
+        if (this.inbox.length == 0) {
+            return;
+        }
+
+        for (let msg of this.inbox) {
+            console.log(`received ${msg.constructor.name}`);
+            switch (msg.constructor) {
+                case Message.Unchoke:
+                    this.state.delete(CHOKED);
+                    this.conn.write(Message.request(0, 0, 3332).asBytes, () => {
+                        console.log('sent REQUEST');
+                    });
+                    break;
+                case Message.Bitfield:
+                    this.conn.write(Message.interested().asBytes, () => {
+                        console.log('sent INTERESTED');
+                    });
+                    break;
+                case Message.Piece:
+                    this.master.emit('piece', msg.payload);
+                    break;
+                default:
+                    console.log('unknown message');
+
+            }
+        }
+
 
     }
 }

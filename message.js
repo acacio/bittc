@@ -1,5 +1,6 @@
 class Handshake {
     constructor (bytes) {
+        this.asBytes = bytes;
 
         const pstrlen = bytes[0];
 
@@ -9,10 +10,37 @@ class Handshake {
     }
 }
 
+function handshake(infoHash, peerId) {
+    const protocol = 'BitTorrent protocol';
+    return new Handshake(
+        Buffer.concat([
+            Buffer.from([protocol.length]),
+            Buffer.from(protocol),
+            Buffer.alloc(8),
+            infoHash,
+            peerId
+        ])
+    );
+}
+
 class KeepAlive {}
 class Choke {}
 class Unchoke {}
-class Interested {}
+
+class Interested {
+    constructor (bytes) {
+        this.asBytes = bytes;
+    }
+}
+
+function interested() {
+    var message = Buffer.alloc(5);
+    message.writeInt32BE(1);
+    message[4] = 2;
+    return new Interested(message);
+}
+
+
 class Uninterested {}
 
 class Have {
@@ -38,10 +66,21 @@ class Bitfield {
 
 class Request {
     constructor (bytes) {
+        this.asBytes = bytes;
         this.pieceIdx = bytes.readInt32BE(5);
         this.offset = bytes.readInt32BE(9);
         this.length = bytes.readInt32BE(13);
     }
+}
+
+function request(pieceIdx, offset, length) {
+    var message = Buffer.alloc(17);
+    message.writeInt32BE(13);
+    message[4] = 6;
+    message.writeInt32BE(pieceIdx, 5);
+    message.writeInt32BE(offset, 9);
+    message.writeInt32BE(length, 13);
+    return new Request(message);
 }
 
 class Piece {
@@ -127,5 +166,9 @@ module.exports = {
     Piece: Piece,
 
     parseHandshake: parseHandshake,
-    parse: parse
+    parse: parse,
+
+    handshake: handshake,
+    request: request,
+    interested: interested
 }

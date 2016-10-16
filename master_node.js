@@ -20,7 +20,7 @@ class MasterNode extends EventEmitter {
 
             const body = Bencode.decode(response);
             this.peers = Tracker.parsePeers(body.get('peers')).map((opts) => {
-                return new PeerNode(this, opts);
+                return new PeerNode(this, this.torrent, opts);
             });
         });
 
