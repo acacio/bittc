@@ -2,6 +2,7 @@ const EventEmitter = require('events').EventEmitter;
 const net = require('net');
 
 const Message = require('./message');
+const Job = require('./job');
 
 
 // Peer states
@@ -33,10 +34,13 @@ class PeerNode extends EventEmitter {
         ];
 
         // pieces available to this peer
-        // TODO: fill with array of false values of length = pieces.length
-        this.bitfield = false;
+        this.bitfield = Array(this.torrent.pieces.length).fill(false);
 
         this.state = new Set([HANDSHAKE, PEER_CHOKING]);
+
+        // current job this peer is busy with
+        // `false` if no job is currently assigned
+        this.job = false;
 
 
         this.initConnection(() => {
@@ -44,6 +48,23 @@ class PeerNode extends EventEmitter {
             this.react();
         });
 
+        this.on('download', onDownload);
+
+
+    }
+
+    onDownload(pieceIdx) {
+        // create job to download pieceIdx
+        this.job = new Job(pieceIdx);
+
+        // start downloading first block
+        this.downloadBlock(0);
+    }
+
+    downloadBlock(blockIdx) {
+        // get block offset within piece
+        // get block length within piece
+        // request block from Peer
     }
 
     initConnection(cb) {
@@ -75,6 +96,10 @@ class PeerNode extends EventEmitter {
             }
 
         });
+    }
+
+    host() {
+        return this.ip + ':' + this.port;
     }
 
     react() {
@@ -133,20 +158,23 @@ class PeerNode extends EventEmitter {
 
     onUnchoke(msg) {
         this.state.delete(PEER_CHOKING);
-        this.outbox.push(Message.request(0, 0, 3332));
+        this.master.emit('needWork', this);
     }
 
     onBitfield(msg) {
         this.outbox.push(Message.interested());
         this.state.add(AM_INTERESTED);
-    }
-
-    onPiece(msg) {
-        this.master.emit('piece', msg.payload);
+        this.bitfield = msg.bitfield;
+        this.master.emit('bitfield', this, this.bitfield);
     }
 
     onHave(msg) {
         this.bitfield[msg.pieceIdx] = true;
+        this.master.emit('bitfield', this, this.bitfield);
+    }
+
+    onPiece(msg) {
+        this.master.emit('piece', msg.payload);
     }
 }
 
