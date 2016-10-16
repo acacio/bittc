@@ -6,7 +6,10 @@ const Message = require('./message');
 
 // Peer states
 const HANDSHAKE = 0;
-const CHOKED = 1;
+const AM_CHOKING = 1;
+const AM_INTERESTED = 2;
+const PEER_CHOKING = 3;
+const PEER_INTERESTED = 4;
 
 class PeerNode extends EventEmitter {
 
@@ -24,7 +27,7 @@ class PeerNode extends EventEmitter {
         // list of messages from peer
         this.inbox = [];
 
-        this.state = new Set([HANDSHAKE, CHOKED]);
+        this.state = new Set([HANDSHAKE, PEER_CHOKING]);
 
 
 
@@ -86,13 +89,14 @@ class PeerNode extends EventEmitter {
             console.log(`received ${msg.constructor.name}`);
             switch (msg.constructor) {
                 case Message.Unchoke:
-                    this.state.delete(CHOKED);
+                    this.state.delete(PEER_CHOKING);
                     this.conn.write(Message.request(0, 0, 3332).asBytes, () => {
                         console.log('sent REQUEST');
                     });
                     break;
                 case Message.Bitfield:
                     this.conn.write(Message.interested().asBytes, () => {
+                        this.state.add(AM_INTERESTED);
                         console.log('sent INTERESTED');
                     });
                     break;
