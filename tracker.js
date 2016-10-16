@@ -9,7 +9,8 @@ const Bencode = require('./bencode');
 class Tracker {
 
 
-    constructor (torrent) {
+    constructor (master, torrent) {
+        this.master = master;
         this.torrent = torrent;
         this.url = url.parse(torrent.data.get('announce').toString());
 
@@ -52,9 +53,10 @@ class Tracker {
             });
 
             res.on('end', () => {
-                const body = Bencode.decode(Buffer.concat(response));
-                console.log(parsePeers(body.get('peers')));
+                master.emit('trackerConnected', Buffer.concat(response));
             });
+        }).on('error', (e) => {
+            console.log(`Tracker failure: ${e.message}`);
         });
             
     }
@@ -79,4 +81,7 @@ function parsePeer(buffer) {
     }
 }
 
-module.exports = Tracker;
+module.exports = {
+    Tracker: Tracker,
+    parsePeers: parsePeers
+}
