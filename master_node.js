@@ -4,6 +4,7 @@ const PeerNode = require('./peer_node');
 const Tracker = require('./tracker');
 const Bencode = require('./bencode');
 const Peer = require('./peer');
+const File = require('./file');
 
 
 class MasterNode extends EventEmitter {
@@ -16,9 +17,16 @@ class MasterNode extends EventEmitter {
         this.tracker = new Tracker.Tracker(this, torrent);
         this.peers = new Map();
 
+        this.downloadPath = __dirname + '/downloads/' + torrent.info.get('name');
+        this.file = new File(this.downloadPath, (err) => {
+            console.log(err);
+        });
+
 
         this.bitfield = Array(this.torrent.pieces.length).fill(false);
         this.pending = Array(this.torrent.pieces.length).fill(false);
+
+        this.missingCount = this.bitfield.length;
 
         this.on('trackerConnected', this.onTrackerConnected);
         this.on('bitfield', this.onBitfield);
@@ -73,9 +81,19 @@ class MasterNode extends EventEmitter {
         }
     }
 
-    onPiece(pieceIdx, piece) {
-        console.log('received PIECE');
-        console.log(piece);
+    onPiece(piece) {
+
+        this.bitfield[piece.idx] = true;
+        this.pending[piece.idx] = false;
+
+        this.file.write(piece);
+
+        this.missingCount-=1;
+
+        if (this.missingCount == 0) {
+            this.emit('finished');
+        }
+
     }
 
     onBitfield(node, bitfield) {

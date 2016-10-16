@@ -14,6 +14,8 @@ class Torrent {
             .digest();
 
         this.pieces = splitToPieces(this.info.get('pieces'));
+        this.length = this.info.get('length');
+        this.pieceLength = this.info.get('piece length');
     }
 
 }

@@ -1,5 +1,20 @@
 const BLOCK_SIZE = 16384;
 
+class Piece {
+
+    constructor (data, idx, offset) {
+        this.data = data;
+        this.idx = idx;
+        this.offset = offset;
+    }
+
+
+}
+
+function offset(idx, length) {
+    return idx * offset;
+}
+
 function getPieceCount(fileSize, pieceSize) {
     return Math.ceil(fileSize / pieceSize); 
 }
@@ -60,5 +75,8 @@ function blockRanges(opts) {
 }
 
 module.exports = {
-    blockRanges: blockRanges
+    Piece: Piece,
+
+    blockRanges: blockRanges,
+    offset: offset
 }

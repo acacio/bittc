@@ -57,8 +57,8 @@ class PeerNode extends EventEmitter {
     onDownload(pieceIdx) {
         const blockRanges = Piece.blockRanges({
             pieceIdx: pieceIdx,
-            fileSize: this.torrent.info.get('length'),
-            pieceSize: this.torrent.info.get('piece length')
+            fileSize: this.torrent.length,
+            pieceSize: this.torrent.pieceLength
         });
 
         // create job to download pieceIdx
@@ -172,7 +172,6 @@ class PeerNode extends EventEmitter {
                     break;
                 default:
                     console.log(`received ${msg.constructor.name}`);
-
             }
         }
     }
@@ -202,16 +201,22 @@ class PeerNode extends EventEmitter {
     onPiece(msg) {
         this.job.addBlock(msg.offset, msg.payload);
         if (this.job.completed()) {
-            this.sendPieceToMaster(this.job.pieceIdx, this.job.piece());
+            const piece = new Piece.Piece(
+                this.job.piece(), 
+                this.job.pieceIdx,
+                Piece.offset(this.job.pieceIdx, this.torrent.pieceLength)
+            );
+
+            this.sendPieceToMaster(piece);
             this.completeJob();
         } else {
             this.downloadBlock(this.job.nextBlockIdx());
         }
-
     }
 
     completeJob() {
         this.job = false;
+        this.master.emit('needWork', this);
     }
 
     sendPieceToMaster(pieceIdx, piece) {
