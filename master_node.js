@@ -11,6 +11,7 @@ class MasterNode extends EventEmitter {
     constructor (torrent) {
         super();
         this.torrent = torrent;
+        this.peerId = Buffer.from('-MM0001-000000000000');
 
         this.tracker = new Tracker.Tracker(this, torrent);
         this.peers = [];

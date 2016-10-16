@@ -5,7 +5,6 @@ const net = require('net');
 
 const protocol = 'BitTorrent protocol';
 const infoHash = Buffer.from('ca155edaa8132d637537990d15dd70f277f72c50', 'hex');
-const peerId = Buffer.from('-MM0001-000000000000');
 
 const handshake = Buffer.concat([
     Buffer.from([protocol.length]),
