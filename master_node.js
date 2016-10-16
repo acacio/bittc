@@ -1,4 +1,5 @@
 const EventEmitter = require('events').EventEmitter;
+const ProgressBar = require('progress');
 
 const PeerNode = require('./peer_node');
 const Tracker = require('./tracker');
@@ -27,6 +28,12 @@ class MasterNode extends EventEmitter {
         this.pending = Array(this.torrent.pieces.length).fill(false);
 
         this.missingCount = this.bitfield.length;
+
+        this.progressbar = new ProgressBar('downloading [:bar] :percent :etas', {
+            complete: '=',
+            incomplete: ' ',
+            total: this.missingCount
+        });
 
         this.on('trackerConnected', this.onTrackerConnected);
         this.on('bitfield', this.onBitfield);
@@ -89,6 +96,8 @@ class MasterNode extends EventEmitter {
         this.file.write(piece);
 
         this.missingCount-=1;
+
+        this.progressbar.tick();
 
         if (this.missingCount == 0) {
             this.emit('finished');

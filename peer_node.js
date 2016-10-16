@@ -45,7 +45,6 @@ class PeerNode extends EventEmitter {
 
 
         this.initConnection(() => {
-            console.log('connected');
             this.react();
         });
 
@@ -141,7 +140,6 @@ class PeerNode extends EventEmitter {
     promiseSendMessage(m) {
         return new Promise((resolve, reject) => {
             this.conn.write(m.asBytes, () => {
-                console.log(`message ${m.constructor.name} has been sent`);
                 resolve(true);
             });
         });
@@ -178,7 +176,6 @@ class PeerNode extends EventEmitter {
 
     onHandshake(msg) {
         this.peerId = msg.peerId;
-        console.log(`received handshake from: ${this.peerId}`);
     }
 
     onUnchoke(msg) {
