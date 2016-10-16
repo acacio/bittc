@@ -3,6 +3,7 @@ const EventEmitter = require('events').EventEmitter;
 const PeerNode = require('./peer_node');
 const Tracker = require('./tracker');
 const Bencode = require('./bencode');
+const Peer = require('./peer');
 
 
 class MasterNode extends EventEmitter {
@@ -10,7 +11,7 @@ class MasterNode extends EventEmitter {
     constructor (torrent) {
         super();
         this.torrent = torrent;
-        this.peerId = Buffer.from('-MM0001-000000000000');
+        this.peerId = padPeerId('-MM0001-');
 
         this.tracker = new Tracker.Tracker(this, torrent);
         this.peers = new Map();
@@ -65,14 +66,14 @@ class MasterNode extends EventEmitter {
         const body = Bencode.decode(response);
         const peerOpts = Tracker.parsePeers(body.get('peers'));
 
-        for (let opts in peerOpts) {
-            const peerNode = new PeerNode(this, this.torrent, opts);
+        for (let opts of peerOpts) {
+            const node = new PeerNode(this, this.torrent, opts);
             const peer = new Peer(node);
             this.peers.set(peer.id, peer);
         }
     }
 
-    onPiece(piece) {
+    onPiece(pieceIdx, piece) {
         console.log('received PIECE');
         console.log(piece);
     }
@@ -89,6 +90,18 @@ class MasterNode extends EventEmitter {
         this.peers.set(peer.id, peer);
     }
 
+}
+
+function padPeerId(prefix) {
+    const pb = Buffer.from(prefix);
+    const padLen = 20 - prefix.length;
+    const pad = Buffer.alloc(padLen);
+
+    for (let i = 0; i < padLen; i++) {
+        pad[i] = Math.floor(Math.random() * 256);
+    }
+
+    return Buffer.concat([pb, pad]);
 }
 
 module.exports = MasterNode;

@@ -3,6 +3,7 @@ const net = require('net');
 
 const Message = require('./message');
 const Job = require('./job');
+const Piece = require('./piece');
 
 
 // Peer states
@@ -48,14 +49,20 @@ class PeerNode extends EventEmitter {
             this.react();
         });
 
-        this.on('download', onDownload);
+        this.on('download', this.onDownload);
 
 
     }
 
     onDownload(pieceIdx) {
+        const blockRanges = Piece.blockRanges({
+            pieceIdx: pieceIdx,
+            fileSize: this.torrent.info.get('length'),
+            pieceSize: this.torrent.info.get('piece length')
+        });
+
         // create job to download pieceIdx
-        this.job = new Job(pieceIdx);
+        this.job = new Job(pieceIdx, blockRanges);
 
         // start downloading first block
         this.downloadBlock(0);
@@ -64,7 +71,18 @@ class PeerNode extends EventEmitter {
     downloadBlock(blockIdx) {
         // get block offset within piece
         // get block length within piece
+        const range = this.job.blockRanges[blockIdx];
         // request block from Peer
+        this.requestBlock(this.job.pieceIdx, range);
+    }
+
+    requestBlock(pieceIdx, range) {
+        const msg = Message.request(
+            pieceIdx, 
+            range[0], 
+            range[1] - range[0]);
+
+        this.outbox.push(msg);
     }
 
     initConnection(cb) {
@@ -73,6 +91,7 @@ class PeerNode extends EventEmitter {
         });
 
         this.conn.on('error', (e) => {
+            console.log(e)
             console.log(`peer has failed: ${this.ip}:${this.port}`);
         });
 
@@ -137,6 +156,9 @@ class PeerNode extends EventEmitter {
 
         for (let msg of this.inbox) {
             switch (msg.constructor) {
+                case Message.Handshake:
+                    this.onHandshake(msg);
+                    break;
                 case Message.Unchoke:
                     this.onUnchoke();
                     break;
@@ -154,6 +176,11 @@ class PeerNode extends EventEmitter {
 
             }
         }
+    }
+
+    onHandshake(msg) {
+        this.peerId = msg.peerId;
+        console.log(`received handshake from: ${this.peerId}`);
     }
 
     onUnchoke(msg) {
@@ -174,7 +201,22 @@ class PeerNode extends EventEmitter {
     }
 
     onPiece(msg) {
-        this.master.emit('piece', msg.payload);
+        this.job.addBlock(msg.offset, msg.payload);
+        if (this.job.completed()) {
+            this.sendPieceToMaster(this.job.pieceIdx, this.job.piece());
+            this.completeJob();
+        } else {
+            this.downloadBlock(this.job.nextBlockIdx());
+        }
+
+    }
+
+    completeJob() {
+        this.job = false;
+    }
+
+    sendPieceToMaster(pieceIdx, piece) {
+        this.master.emit('piece', pieceIdx, piece);
     }
 }
 
