@@ -40,6 +40,26 @@ describe('Bencode', () => {
             assert(result.get('foo') == 42);
         });
 
+        it('should handle torrent file', () => {
+            const data = fs.readFileSync(__dirname + '/data/loremipsum.torrent');
+            const torrent = Bencode.decode(data);
+            assert(torrent.has('announce'));
+            assert(torrent.has('created by'));
+            assert(torrent.has('creation date'));
+            assert(torrent.has('encoding'));
+            assert(torrent.has('info'));
+
+            const info = torrent.get('info');
+            assert(info.has('length'));
+            assert(info.has('name'));
+            assert(info.has('piece length'));
+            assert(info.has('pieces'));
+            assert(info.has('private'));
+
+            assert.instanceOf(torrent.get('announce'), Buffer);
+            assert.typeOf(torrent.get('creation date'), 'number');
+        });
+
 
     });
 
@@ -63,6 +83,17 @@ describe('Bencode', () => {
                 [['bar', Buffer.from('spam')], ['foo', 42]]
             );
             assert.equal(Bencode.encode(m), 'd3:bar4:spam3:fooi42ee');
+        });
+
+        it('should handle torrent file', () => {
+
+
+            const data = fs.readFileSync(__dirname + '/data/loremipsum.torrent');
+            const torrent = Bencode.decode(data);
+
+            assert.equal(data.toString(), Bencode.encode(torrent));
+
+
         });
     });
 
