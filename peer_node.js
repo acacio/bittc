@@ -27,6 +27,10 @@ class PeerNode extends EventEmitter {
         // list of messages from peer
         this.inbox = [];
 
+        // pieces available to this peer
+        // TODO: fill with array of false values of length = pieces.length
+        this.bitfield = false;
+
         this.state = new Set([HANDSHAKE, PEER_CHOKING]);
 
 
@@ -86,30 +90,47 @@ class PeerNode extends EventEmitter {
         }
 
         for (let msg of this.inbox) {
-            console.log(`received ${msg.constructor.name}`);
             switch (msg.constructor) {
                 case Message.Unchoke:
-                    this.state.delete(PEER_CHOKING);
-                    this.conn.write(Message.request(0, 0, 3332).asBytes, () => {
-                        console.log('sent REQUEST');
-                    });
+                    this.onUnchoke();
                     break;
                 case Message.Bitfield:
-                    this.conn.write(Message.interested().asBytes, () => {
-                        this.state.add(AM_INTERESTED);
-                        console.log('sent INTERESTED');
-                    });
+                    this.onBitfield(msg);
                     break;
                 case Message.Piece:
-                    this.master.emit('piece', msg.payload);
+                    this.onPiece(msg);
+                    break;
+                case Message.Have:
+                    this.onHave(msg);
                     break;
                 default:
-                    console.log('unknown message');
+                    console.log(`received ${msg.constructor.name}`);
 
             }
         }
+    }
 
+    onUnchoke(msg) {
+        this.state.delete(PEER_CHOKING);
+        this.conn.write(Message.request(0, 0, 3332).asBytes, () => {
+            console.log('sent REQUEST');
+        });
+    }
 
+    onBitfield(msg) {
+        this.conn.write(Message.interested().asBytes, () => {
+            this.bitfield = msg.bitfield;
+            this.state.add(AM_INTERESTED);
+            console.log('sent INTERESTED');
+        });
+    }
+
+    onPiece(msg) {
+        this.master.emit('piece', msg.payload);
+    }
+
+    onHave(msg) {
+        this.bitfield[msg.pieceIdx] = true;
     }
 }
 
