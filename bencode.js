@@ -1,13 +1,13 @@
+const INT_START = Buffer.from('i')[0];
+const END = Buffer.from('e')[0];
+const LIST_START = Buffer.from('l')[0];
+const DICT_START = Buffer.from('d')[0];
+const BA_START = Buffer.from(':')[0];
+
 
 function decode(data) {
 
     var position = 0;
-
-    const INT_START = Buffer.from('i')[0];
-    const END = Buffer.from('e')[0];
-    const LIST_START = Buffer.from('l')[0];
-    const DICT_START = Buffer.from('d')[0];
-    const BA_START = Buffer.from(':')[0];
 
 
     function int() {
@@ -98,34 +98,42 @@ function decode(data) {
 function encode(obj) {
 
     function int(o) {
-        return 'i' + o + 'e';
+        return Buffer.concat([
+            Buffer.from([INT_START]),
+            str(o.toString()),
+            Buffer.from([END])
+        ]);
     }
 
     function str(o) {
-        return o.length + ':' + o;
+        return Buffer.from(o);
     }
 
     function buffer(o) {
-        return str(o.toString());
+        return Buffer.concat([
+            str(o.length.toString()),
+            Buffer.from([BA_START]),
+            o
+        ]);
     }
 
     function list(o) {
-        var acc = 'l';
+        var acc = [Buffer.from([LIST_START])];
         for (let e of o) {
-            acc += any(e);
+            acc.push(any(e));
         }
-        acc += 'e';
-        return acc;
+        acc.push(Buffer.from([END]));
+        return Buffer.concat(acc);
     }
 
     function dict(o) {
-        var acc = 'd';
+        var acc = [Buffer.from([DICT_START])];
         for (let [k, v] of o) {
-            acc += str(k);
-            acc += any(v);
+            acc.push(buffer(Buffer.from(k)));
+            acc.push(any(v));
         }
-        acc += 'e';
-        return acc;
+        acc.push(Buffer.from([END]));
+        return Buffer.concat(acc);
     }
 
 

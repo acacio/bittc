@@ -71,11 +71,13 @@ describe('Bencode', () => {
         });
 
         it('should encode strings', () => {
-            assert.equal(Bencode.encode('spam'), '4:spam');
+            assert(Bencode.encode('spam').equals(Buffer.from('spam')));
         });
 
         it('should encode lists', () => {
-            assert.equal(Bencode.encode(['spam', 42]), 'l4:spami42ee');
+            assert(
+                Bencode.encode([Buffer.from('spam'), 42]).equals(
+                    Buffer.from('l4:spami42ee')));
         });
 
         it('should encode dictionaries', () => {
