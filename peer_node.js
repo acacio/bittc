@@ -27,6 +27,11 @@ class PeerNode extends EventEmitter {
         // list of messages from peer
         this.inbox = [];
 
+        // queue of messages ready to be sent to peer
+        this.outbox = [
+            Message.handshake(this.torrent.infoHash, this.master.peerId)
+        ];
+
         // pieces available to this peer
         // TODO: fill with array of false values of length = pieces.length
         this.bitfield = false;
@@ -34,17 +39,16 @@ class PeerNode extends EventEmitter {
         this.state = new Set([HANDSHAKE, PEER_CHOKING]);
 
 
-
-        this.conn = net.createConnection(this.port, this.ip, () => {
+        this.initConnection(() => {
             console.log('connected');
+            this.react();
+        });
 
-            const handshake = Message.handshake(
-                this.torrent.infoHash,
-                this.master.peerId);
+    }
 
-            this.conn.write(handshake.asBytes, () => {
-                console.log('send handshake');
-            });
+    initConnection(cb) {
+        this.conn = net.createConnection(this.port, this.ip, () => {
+            cb();
         });
 
         this.conn.on('error', (e) => {
@@ -71,16 +75,33 @@ class PeerNode extends EventEmitter {
             }
 
         });
-
-
-        this.react();
     }
 
     react() {
+        const self = this;
+
         this.handleIncomingMessages();
         this.inbox = [];
 
-        setImmediate(() => {this.react()});
+        this.handleOutgoingMessages()
+            .then(() => { self.outbox = []; })
+            .then(() => {
+                setImmediate(() => {this.react()});
+            });
+    }
+
+    handleOutgoingMessages() {
+        const msgs = this.outbox.map((m) => this.promiseSendMessage(m));
+        return Promise.all(msgs);
+    }
+
+    promiseSendMessage(m) {
+        return new Promise((resolve, reject) => {
+            this.conn.write(m.asBytes, () => {
+                console.log(`message ${m.constructor.name} has been sent`);
+                resolve(true);
+            });
+        });
     }
 
 
@@ -112,17 +133,12 @@ class PeerNode extends EventEmitter {
 
     onUnchoke(msg) {
         this.state.delete(PEER_CHOKING);
-        this.conn.write(Message.request(0, 0, 3332).asBytes, () => {
-            console.log('sent REQUEST');
-        });
+        this.outbox.push(Message.request(0, 0, 3332));
     }
 
     onBitfield(msg) {
-        this.conn.write(Message.interested().asBytes, () => {
-            this.bitfield = msg.bitfield;
-            this.state.add(AM_INTERESTED);
-            console.log('sent INTERESTED');
-        });
+        this.outbox.push(Message.interested());
+        this.state.add(AM_INTERESTED);
     }
 
     onPiece(msg) {
