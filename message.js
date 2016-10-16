@@ -110,9 +110,15 @@ function parse(bytes) {
     }
 
     const length = bytes.readInt32BE();
+
+    if (bytes.length - 4 < length) {
+        return [false, bytes];
+    }
+
     if (length == 0) {
         return [new KeepAlive(), bytes.slice(4)];
     }
+
 
     const id = bytes[4];
 

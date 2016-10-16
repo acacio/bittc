@@ -66,8 +66,14 @@ describe('Message', () => {
 
 
         it('should not return message if not all data available', () => {
-            const b = Buffer([0x00, 0x00, 0x00]);
-            const [message, buffer] = Message.parse(b);
+            var b, message, buffer;
+
+            b = Buffer([0x00, 0x00, 0x00]);
+            [message, buffer] = Message.parse(b);
+            assert(message == false);
+
+            b = Buffer([0x00, 0x00, 0x00, 0x03, 0x01]);
+            [message, buffer] = Message.parse(b);
             assert(message == false);
         });
 
