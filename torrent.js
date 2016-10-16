@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 const Bencode = require('./bencode');
 
 class Torrent {
@@ -5,6 +7,11 @@ class Torrent {
     constructor (buffer) {
         this.data = Bencode.decode(buffer);
         this.info = this.data.get('info');
+
+        // byte array
+        this.infoHash = crypto.createHash('sha1')
+            .update(Bencode.encode(this.info))
+            .digest();
     }
 
     pieces() {
@@ -19,3 +26,5 @@ class Torrent {
         return acc;
     }
 }
+
+module.exports = Torrent
