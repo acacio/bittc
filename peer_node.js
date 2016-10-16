@@ -91,7 +91,6 @@ class PeerNode extends EventEmitter {
         });
 
         this.conn.on('error', (e) => {
-            console.log(e)
             console.log(`peer has failed: ${this.ip}:${this.port}`);
         });
 
